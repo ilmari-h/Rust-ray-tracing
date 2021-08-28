@@ -10,21 +10,31 @@ pub struct Vec3 {
     pub z: f64
 }
 
-pub fn unit_vec(vec: &Vec3) -> Vec3 {
-    let v = vec.clone();
-    return v / v.len();
+pub fn unit_vec(vec: Vec3) -> Vec3 {
+    return vec / vec.len();
+}
+
+pub fn dot(u: Vec3, v: Vec3) -> f64 {
+    return
+        u[0] * v[0]
+      + u[1] * v[1]
+      + u[2] * v[2]
 }
 
 impl Vec3 {
+    pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
+        return Vec3{x:x,y:y,z:z};
+    }
     pub fn len(self) -> f64 {
         let sqlen = self.len_sq();
+
         return sqlen.sqrt();
     }
-    
+
     pub fn len_sq(self) -> f64 {
         return self.x * self.x + self.y * self.y + self.z * self.z;
     }
-    
+
     pub fn cross(self,v: Vec3) -> Vec3 {
         return Vec3{
             x: self[1] * v[2] - self[2] * v[1],
@@ -33,7 +43,7 @@ impl Vec3 {
     }
 
     pub fn dot(self, v: Vec3) -> f64 {
-        return 
+        return
               self[0] * v[0]
             + self[1] * v[1]
             + self[2] * v[2]
@@ -41,11 +51,23 @@ impl Vec3 {
 
 }
 
+impl ops::Neg for Vec3 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        return Vec3{
+            x: -self.x,
+            y: -self.y,
+            z: -self.z
+        };
+    }
+}
+
 impl ops::Add<Vec3> for Vec3 {
     type Output = Vec3;
     fn add(self, other: Vec3) -> Vec3 {
         return Vec3{
-            x: self.x + other.x, 
+            x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z
         };
@@ -56,7 +78,7 @@ impl ops::Sub<Vec3> for Vec3 {
     type Output = Vec3;
     fn sub(self, other: Vec3) -> Vec3 {
         return Vec3{
-            x: self.x - other.x, 
+            x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z
         };
@@ -67,7 +89,7 @@ impl ops::Mul<f64> for Vec3 {
     type Output = Vec3;
     fn mul(self, other: f64) -> Vec3 {
         return Vec3{
-            x: self.x * other, 
+            x: self.x * other,
             y: self.y * other,
             z: self.z * other
         };
@@ -77,7 +99,7 @@ impl ops::Mul<f64> for Vec3 {
 impl ops::Mul<Vec3> for f64 {
     type Output = Vec3;
     fn mul(self, other: Vec3) -> Vec3 {
-       return other*self; 
+       return other*self;
     }
 }
 
@@ -85,7 +107,7 @@ impl ops::Mul<Vec3> for Vec3 {
     type Output = Vec3;
     fn mul(self, other: Vec3) -> Vec3 {
         return Vec3{
-            x: self.x * other.x, 
+            x: self.x * other.x,
             y: self.y * other.y,
             z: self.z * other.z
         };
@@ -96,7 +118,7 @@ impl ops::Div<f64> for Vec3 {
     type Output = Vec3;
     fn div(self, other: f64) -> Vec3 {
         return Vec3{
-            x: self.x / other, 
+            x: self.x / other,
             y: self.y / other,
             z: self.z / other
         };
@@ -107,7 +129,7 @@ impl ops::Div<Vec3> for Vec3 {
     type Output = Vec3;
     fn div(self, other: Vec3) -> Vec3 {
         return Vec3{
-            x: self.x / other.x, 
+            x: self.x / other.x,
             y: self.y / other.y,
             z: self.z / other.z
         };
