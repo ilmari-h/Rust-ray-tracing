@@ -30,8 +30,7 @@ impl Hittable for HittableVec {
         let mut closest_so_far = t_max;
         let mut hit_rec = None;
         for boxed in self.iter() {
-            // Find closest hit and return that so that objects closer to camera cover the ones
-            // behind them.
+
             let hittable = boxed.as_ref();
             let new_hit_record = hittable.hit(ray,t_min,closest_so_far);
             match new_hit_record {

@@ -1,4 +1,5 @@
 use std::ops;
+use rand::Rng;
 
 pub type Point3 = Vec3;
 pub type Color = Vec3;
@@ -21,9 +22,33 @@ pub fn dot(u: Vec3, v: Vec3) -> f64 {
       + u[2] * v[2]
 }
 
+pub fn random_in_unit_sphere() -> Vec3 {
+    loop {
+        let vec = Vec3::new_random(Some(-1.0..1.0));
+        if vec.len_sq() < 1.0 { return vec }
+    }
+}
+
+pub fn random_unit() -> Vec3 {
+    return unit_vec(random_in_unit_sphere());
+}
+
 impl Vec3 {
     pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
         return Vec3{x:x,y:y,z:z};
+    }
+
+    pub fn new_zero() -> Vec3 {
+        return Vec3{x:0.0,y:0.0,z:0.0};
+    }
+
+    pub fn new_random(range: Option<ops::Range<f64>>) -> Vec3 {
+        let mut rng = rand::thread_rng();
+        match range {
+            Some(r) => return Vec3::new( rng.gen_range(r.clone()), rng.gen_range(r.clone()), rng.gen_range(r.clone())),
+            None =>  return Vec3::new(rng.gen_range(0.0..1.0),rng.gen_range(0.0..1.0),rng.gen_range(0.0..1.0))
+         }
+
     }
     pub fn len(self) -> f64 {
         let sqlen = self.len_sq();

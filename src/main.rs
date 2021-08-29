@@ -1,94 +1,125 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Range;
+mod camera;
+use camera::Camera;
 mod vec;
-use vec::{Vec3, Color, Point3};
+use vec::{Vec3, Color, Point3, random_unit};
 mod ray;
 use ray::Ray;
 use rand::Rng;
 mod hittables;
 use hittables::{Sphere, Hittable, HittableVec, HitRecord};
+use indicatif::{ProgressBar, ProgressStyle};
 
 // NOTE: add concurrency
 
-const ASPECT_R: f32 = 16.0 / 9.0;
+const ASPECT_R: f64 = 16.0 / 9.0;
 const IWIDTH: usize = 400; // Making this big causes stack overflow because of array size IWIDTH*IHEIGHT.
 const IHEIGHT: usize = ( IWIDTH as f32 / ASPECT_R as f32 ) as usize ;
+const BLACK: Vec3 = Vec3{x:0.0,y:0.0,z:0.0};
+const RAY_RECURSION_DEPTH: u32 = 50;
 type Pixel = [i32; 3];
 type PArr = [Pixel; IWIDTH*IHEIGHT];
 
-fn get_random(range: Option<Range<f64>>) -> f64 {
+fn get_random(
+    range: Option<Range<f64>>,
+    distribution: rand::distributions::Uniform<f64>
+    ) -> f64 {
     let mut rng = rand::thread_rng();
     match range {
         Some(r) => return rng.gen_range(r),
-        None => return rng.gen_range(0.0..1.0)
+        None => {
+            return rng.sample(distribution);
+        }
     }
 }
 
-fn pixel_color(ray: &Ray, objects: &HittableVec) -> Color {
+fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
     let collision: Option<HitRecord> = objects.hit(ray,0.0,f64::INFINITY);
+    if depth == 0 { return BLACK }
+
     match collision {
-        Some(rec) => {
-            return 0.5 * ( rec.normal + Color::new(1.0,1.0,1.0) )*255.0;
+        Some(record) => {
+            let target = record.p + record.normal + random_unit();
+            let bounced_ray = Ray::new(record.p, target - record.p);
+            return 0.5 * ray_color(&bounced_ray, &objects, depth -1);
         },
-        None => ()
+        None => {
+            let unit_dir =  vec::unit_vec(ray.dir);
+            let target = 0.5*(unit_dir.y + 1.0);
+            return (1.0-target) * Color::new(1.0,1.0,1.0) + target * Color::new(0.5,0.7,1.0);
+        }
     }
-    let unit_dir =  vec::unit_vec(ray.dir);
-    let t = 0.5*(unit_dir.y + 1.0);
-    return 255.0 * ((1.0-t) * Color::new(1.0,1.0,1.0) + t * Color::new(0.5,0.7,1.0));
 }
 
 fn main() -> () {
+
     let mut objects = HittableVec::new();
     objects.push(Box::new(Sphere{center: Vec3::new(0.0, 0.0, -1.0), radius: 0.5}));
     objects.push(Box::new(Sphere{center: Vec3::new(0.0, -100.5, -1.0), radius: 100.0}));
 
     let mut im: PArr = [[0,0,0]; IWIDTH*IHEIGHT];
 
-    im = render(&im, &objects);
+    println!("Rendering image...");
+    im = render(&im, &objects); // TODO combine these two
     save_image(&im);
 }
 
 fn render(img: &PArr, objects: &HittableVec) -> PArr {
 
-    // Camera
-    let vp_height = 2.0;
-    let vp_width = ASPECT_R * vp_height;
-    let focal_length = 1.0;
-    let origin = Point3{x: 0.0, y: 0.0, z: 0.0};
+    let distribution = rand::distributions::Uniform::new(0.0, 1.0);
 
-    let horizontal = Vec3{x: vp_width as f64, y: 0.0, z: 0.0};
-    let vertical = Vec3{x: 0.0, y: vp_height as f64, z: 0.0};
-    let low_left_corner = origin - horizontal/2.0 - vertical/2.0 - Vec3{x:0.0,y:0.0,z: focal_length};
+    // Camera
+    let camera = Camera::new( ASPECT_R );
+    let pixel_samples = 100;
+    let bar = ProgressBar::new(IHEIGHT as u64);
+    bar.set_style(ProgressStyle::default_bar()
+                   .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+                   .progress_chars("#>-"));
 
     let mut x = 0;
     let mut y = IHEIGHT;
     let mut n_img: PArr = img.to_owned();
     for i in 0..IWIDTH*IHEIGHT {
 
-        // Shoot ray from viewport.
-        let u: f64 = (x as f32 / ( IWIDTH as f32 - 1.0 )).into(); // horizontal offset, percentage
-        let v: f64 = (y as f32 / ( IHEIGHT as f32 - 1.0 )).into(); // vertical offset percentage
-        let ray: Ray = Ray::new( // see Figure 3: Camera geometry
-            origin,
-            low_left_corner // In relation to bottom left corner
-                + u * horizontal // Add horizontal offset vector u
-                + v * vertical // Add vertical offset vector v
-                - origin // Offset to put origin in center (no effect when {0,0,0}).
-        );
+        // Create rays.
+        let mut color = Color::new(0.0,0.0,0.0);
+        for _ in 0..pixel_samples {
+
+            let u: f64 = ( // horizontal offset percentage
+                ( x as f32 + get_random(None, distribution) as f32 )
+                / ( IWIDTH as f32 - 1.0 )
+            ).into();
+            let v: f64 = ( // vertical offset percentage
+                ( y as f32 + get_random(None, distribution) as f32 )
+                / ( IHEIGHT as f32 - 1.0 )
+            ).into();
+
+            let ray: Ray = camera.get_ray(u,v);
+            color = color + ray_color(&ray, objects, RAY_RECURSION_DEPTH);
+        }
+
+        // Scale by samples and gamma correction
+        let scale = 1.0 / pixel_samples as f64;
+        color = Vec3::new(
+            (color.x * scale).sqrt(),
+            (color.y * scale).sqrt(),
+            (color.z * scale).sqrt()
+        ) * 255.0;
 
         // Add pixel
-        let color = pixel_color(&ray, objects);
         n_img[i] = [color[0] as i32,color[1] as i32,color[2] as i32];
 
         // screen coordinates
         x = x+1;
         if x % IWIDTH == 0 {
+            bar.inc(1);
             y = y-1;
             x = 0;
         }
-
     }
+    bar.finish();
     return n_img;
 }
 
