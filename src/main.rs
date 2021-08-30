@@ -19,6 +19,7 @@ const IWIDTH: usize = 400; // Making this big causes stack overflow because of a
 const IHEIGHT: usize = ( IWIDTH as f32 / ASPECT_R as f32 ) as usize ;
 const BLACK: Vec3 = Vec3{x:0.0,y:0.0,z:0.0};
 const RAY_RECURSION_DEPTH: u32 = 50;
+const ALMOST_ZERO: f64 = 0.001;
 type Pixel = [i32; 3];
 type PArr = [Pixel; IWIDTH*IHEIGHT];
 
@@ -36,7 +37,7 @@ fn get_random(
 }
 
 fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
-    let collision: Option<HitRecord> = objects.hit(ray,0.0,f64::INFINITY);
+    let collision: Option<HitRecord> = objects.hit(ray,ALMOST_ZERO,f64::INFINITY);
     if depth == 0 { return BLACK }
 
     match collision {

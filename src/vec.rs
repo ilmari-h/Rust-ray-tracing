@@ -24,7 +24,7 @@ pub fn dot(u: Vec3, v: Vec3) -> f64 {
 
 pub fn random_in_unit_sphere() -> Vec3 {
     loop {
-        let vec = Vec3::new_random(Some(-1.0..1.0));
+        let vec = Vec3::new_random(Some(-1.0..1.0)); // FIXME uniform distribution?
         if vec.len_sq() < 1.0 { return vec }
     }
 }
@@ -42,7 +42,7 @@ impl Vec3 {
         return Vec3{x:0.0,y:0.0,z:0.0};
     }
 
-    pub fn new_random(range: Option<ops::Range<f64>>) -> Vec3 {
+    pub fn new_random(range: Option<ops::Range<f64>>) -> Vec3 { // FIXME uniform distribution?
         let mut rng = rand::thread_rng();
         match range {
             Some(r) => return Vec3::new( rng.gen_range(r.clone()), rng.gen_range(r.clone()), rng.gen_range(r.clone())),
