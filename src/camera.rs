@@ -1,4 +1,4 @@
-use crate::vec::{Vec3, Point3, dot};
+use crate::vec::{Vec3, Point3};
 use crate::ray::Ray;
 
 #[derive(Copy, Clone)]
@@ -14,8 +14,7 @@ impl Camera {
         let focal_l = 1.0;
         let vp_h_f = 2.0;
         let vp_w_f = aspect_r * vp_h_f;
-        let origin = Point3::new(0.0,0.0,0.0);
-
+        let origin = Point3::new(0.0,0.0,1.0);
         let horizontal_max = Vec3::new(vp_w_f, 0.0, 0.0);
         let vertical_max = Vec3::new(0.0, vp_h_f, 0.0);
 

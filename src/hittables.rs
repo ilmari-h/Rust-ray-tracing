@@ -1,4 +1,4 @@
-use crate::vec::{Vec3, Point3, dot};
+use crate::vec::{Vec3, Point3, Color, NEAR_ZERO};
 use crate::ray::Ray;
 
 pub type HittableVec = Vec<Box<dyn Hittable>>;
@@ -6,7 +6,14 @@ pub type HittableVec = Vec<Box<dyn Hittable>>;
 #[derive(Copy, Clone)]
 pub struct Sphere {
     pub center: Point3,
-    pub radius: f64
+    pub radius: f64,
+    pub material: &'static dyn Material
+}
+
+#[derive(Copy, Clone)]
+pub struct Plane {
+    pub y: f64,
+    pub material: &'static dyn Material
 }
 
 #[derive(Copy, Clone)]
@@ -14,11 +21,44 @@ pub struct HitRecord {
     pub p: Point3,
     pub normal: Vec3,
     pub front_face: bool,
+    pub hit_material: &'static dyn Material,
     pub t: f64,
 }
 
+impl HitRecord {
+    pub fn on_hit(&self, ray_in: &Ray) -> (Ray,Color) {
+        return self.hit_material.scatter(&self, ray_in);
+    }
+}
+
+pub struct Diffuse {
+    pub attenuation: Color
+}
+
+pub struct Metal {
+    pub attenuation: Color
+}
+
 fn is_front_facing(ray: &Ray, outward_normal: Vec3) -> bool {
-    return dot(ray.dir, outward_normal).is_sign_negative();
+    return Vec3::dot(ray.dir, outward_normal).is_sign_negative();
+}
+
+pub trait Material {
+    fn scatter(&self, record: &HitRecord, ray_in: &Ray) -> (Ray, Color);
+}
+
+impl Material for Diffuse {
+    fn scatter(&self, record: &HitRecord, _: &Ray) -> (Ray, Color) {
+        let target = record.p + record.normal + Vec3::random_unit();
+        return (Ray::new(record.p, target - record.p), self.attenuation);
+    }
+}
+
+impl Material for Metal {
+    fn scatter(&self, record: &HitRecord, ray_in: &Ray) -> (Ray, Color) {
+        let reflected = Vec3::reflect(ray_in.dir,record.normal);
+        return (Ray::new(record.p, reflected), self.attenuation);
+    }
 }
 
 pub trait Hittable {
@@ -45,6 +85,34 @@ impl Hittable for HittableVec {
     }
 }
 
+impl Hittable for Plane {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+
+        // Plane
+        let plane_normal = Vec3::new(0.0,-1.0,0.0);
+        let point_on_ray = ray.orig;
+        let denom = Vec3::dot(ray.dir, plane_normal);
+        if denom < NEAR_ZERO {
+            return None;
+        }
+        let point_on_plane = Vec3::new(0.0, self.y, 0.0);
+        let t = (Vec3::dot((point_on_plane - point_on_ray),plane_normal) / denom).abs();
+
+        if t < t_min || t > t_max {
+            return None;
+        }
+        let p = ray.at(t);
+        let front_face = is_front_facing(&ray, plane_normal);
+        return Some( HitRecord {
+            t: t,
+            p: p,
+            front_face: front_face,
+            normal: if front_face { plane_normal } else { -plane_normal },
+            hit_material: self.material
+        } );
+    }
+}
+
 impl Hittable for Sphere {
 
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
@@ -52,7 +120,7 @@ impl Hittable for Sphere {
         // see Figure 5: Ray-sphere intersection results
         let oc = ray.orig - self.center;
         let a = ray.dir.len_sq();
-        let half_b = dot(oc, ray.dir);
+        let half_b = Vec3::dot(oc, ray.dir);
         let c = oc.len_sq() - self.radius.powi(2);
         let discriminant = half_b*half_b - a*c;
         if discriminant.is_sign_negative() { return None };
@@ -67,12 +135,12 @@ impl Hittable for Sphere {
         let p = ray.at(t);
         let outward_normal = (p - self.center) / self.radius;
         let front_face = is_front_facing(&ray, outward_normal);
-        let rec = HitRecord{
+        return Some( HitRecord{
             t: root,
             p: p,
             front_face: front_face,
-            normal: if front_face { outward_normal } else {-outward_normal}
-        };
-        return Some(rec);
+            normal: if front_face { outward_normal } else {-outward_normal},
+            hit_material: self.material
+        } );
     }
 }

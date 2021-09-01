@@ -1,21 +1,24 @@
+extern crate indicatif;
 use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Range;
 mod camera;
 use camera::Camera;
 mod vec;
-use vec::{Vec3, Color, Point3, random_unit};
+use vec::{Vec3, Color, Point3};
 mod ray;
 use ray::Ray;
 use rand::Rng;
 mod hittables;
-use hittables::{Sphere, Hittable, HittableVec, HitRecord};
+use hittables::{Sphere, Plane, Hittable, HittableVec, HitRecord, Diffuse, Metal};
 use indicatif::{ProgressBar, ProgressStyle};
+mod texture;
+use texture::load_texture;
 
 // NOTE: add concurrency
 
 const ASPECT_R: f64 = 16.0 / 9.0;
-const IWIDTH: usize = 400; // Making this big causes stack overflow because of array size IWIDTH*IHEIGHT.
+const IWIDTH: usize = 720; // Making this big causes stack overflow because of array size IWIDTH*IHEIGHT.
 const IHEIGHT: usize = ( IWIDTH as f32 / ASPECT_R as f32 ) as usize ;
 const BLACK: Vec3 = Vec3{x:0.0,y:0.0,z:0.0};
 const RAY_RECURSION_DEPTH: u32 = 50;
@@ -23,15 +26,46 @@ const ALMOST_ZERO: f64 = 0.001;
 type Pixel = [i32; 3];
 type PArr = [Pixel; IWIDTH*IHEIGHT];
 
+const BROWN_MATTE: Diffuse = Diffuse{
+    attenuation: Color{x: 0.51, y: 0.31, z: 0.21}
+};
+
+const CLEAR_METAL: Metal = Metal{
+    attenuation: Color{x: 1.0, y: 1.0, z: 1.0}
+};
+
+const BLUE_METAL: Metal = Metal{
+    attenuation: Color{x: 0.20, y: 0.20, z: 0.70}
+};
+
+const GREEN_METAL: Metal = Metal{
+    attenuation: Color{x: 0.0, y: 0.70, z: 0.0}
+};
+
+const RED_METAL: Metal = Metal{
+    attenuation: Color{x: 0.6, y: 0.1, z: 0.1}
+};
+
+const BLACK_METAL: Metal = Metal{
+    attenuation: Color{x: 0.1, y: 0.1, z: 0.1}
+};
+
+const BLACK_MATTE: Metal = Metal{
+    attenuation: Color{x: 0.1, y: 0.1, z: 0.1}
+};
+
+const GREEN_MATTE: Diffuse = Diffuse{
+    attenuation: Color{x: 0.21, y: 0.61, z: 0.21}
+};
+
 fn get_random(
     range: Option<Range<f64>>,
-    distribution: rand::distributions::Uniform<f64>
     ) -> f64 {
     let mut rng = rand::thread_rng();
     match range {
         Some(r) => return rng.gen_range(r),
         None => {
-            return rng.sample(distribution);
+            return rng.gen_range(0.0..1.0);
         }
     }
 }
@@ -42,12 +76,11 @@ fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
 
     match collision {
         Some(record) => {
-            let target = record.p + record.normal + random_unit();
-            let bounced_ray = Ray::new(record.p, target - record.p);
-            return 0.5 * ray_color(&bounced_ray, &objects, depth -1);
+            let (bounced_ray, attenuation) = record.on_hit(ray);
+            return attenuation * ray_color(&bounced_ray, &objects, depth -1);
         },
         None => {
-            let unit_dir =  vec::unit_vec(ray.dir);
+            let unit_dir =  Vec3::unit_vec(ray.dir);
             let target = 0.5*(unit_dir.y + 1.0);
             return (1.0-target) * Color::new(1.0,1.0,1.0) + target * Color::new(0.5,0.7,1.0);
         }
@@ -55,10 +88,16 @@ fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
 }
 
 fn main() -> () {
-
+    load_texture();
     let mut objects = HittableVec::new();
-    objects.push(Box::new(Sphere{center: Vec3::new(0.0, 0.0, -1.0), radius: 0.5}));
-    objects.push(Box::new(Sphere{center: Vec3::new(0.0, -100.5, -1.0), radius: 100.0}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.51, 0.0, -1.0), radius: 0.5, material: &BROWN_MATTE}));
+    objects.push(Box::new(Sphere{center: Vec3::new(0.51, 0.0, -1.0), radius: 0.5, material: &BLUE_METAL}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.1, -0.35, 0.2), radius: 0.15, material: &CLEAR_METAL}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-1.2, 0.0, 0.0), radius: 0.5, material: &BLUE_METAL}));
+    objects.push(Box::new(Sphere{center: Vec3::new(1.2, 0.0, 0.0), radius: 0.5, material: &RED_METAL}));
+    objects.push(Box::new(Sphere{center: Vec3::new(0.5, -0.35, -0.3), radius: 0.15, material: &GREEN_MATTE}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.7, -0.35, -0.48), radius: 0.15, material: &GREEN_METAL}));
+    objects.push(Box::new(Plane{y:-0.5, material: &BLACK_MATTE }));
 
     let mut im: PArr = [[0,0,0]; IWIDTH*IHEIGHT];
 
@@ -68,8 +107,6 @@ fn main() -> () {
 }
 
 fn render(img: &PArr, objects: &HittableVec) -> PArr {
-
-    let distribution = rand::distributions::Uniform::new(0.0, 1.0);
 
     // Camera
     let camera = Camera::new( ASPECT_R );
@@ -89,11 +126,11 @@ fn render(img: &PArr, objects: &HittableVec) -> PArr {
         for _ in 0..pixel_samples {
 
             let u: f64 = ( // horizontal offset percentage
-                ( x as f32 + get_random(None, distribution) as f32 )
+                ( x as f32 + get_random(None) as f32 )
                 / ( IWIDTH as f32 - 1.0 )
             ).into();
             let v: f64 = ( // vertical offset percentage
-                ( y as f32 + get_random(None, distribution) as f32 )
+                ( y as f32 + get_random(None) as f32 )
                 / ( IHEIGHT as f32 - 1.0 )
             ).into();
 

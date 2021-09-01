@@ -11,29 +11,39 @@ pub struct Vec3 {
     pub z: f64
 }
 
-pub fn unit_vec(vec: Vec3) -> Vec3 {
-    return vec / vec.len();
-}
-
-pub fn dot(u: Vec3, v: Vec3) -> f64 {
-    return
-        u[0] * v[0]
-      + u[1] * v[1]
-      + u[2] * v[2]
-}
-
-pub fn random_in_unit_sphere() -> Vec3 {
-    loop {
-        let vec = Vec3::new_random(Some(-1.0..1.0)); // FIXME uniform distribution?
-        if vec.len_sq() < 1.0 { return vec }
-    }
-}
-
-pub fn random_unit() -> Vec3 {
-    return unit_vec(random_in_unit_sphere());
-}
+pub const NEAR_ZERO: f64 = 1e-8;
 
 impl Vec3 {
+
+    pub fn near_zero(v: Vec3) -> bool {
+        return v.x.abs() < NEAR_ZERO && v.y.abs() < NEAR_ZERO && v.z.abs() < NEAR_ZERO;
+    }
+    pub fn reflect(inbound: Vec3, normal: Vec3) -> Vec3 {
+        return inbound - 2.0*Vec3::dot(inbound,normal) * normal;
+    }
+
+    pub fn random_in_unit_sphere() -> Vec3 {
+        loop {
+            let vec = Vec3::new_random(Some(-1.0..1.0));
+            if vec.len_sq() < 1.0 { return vec }
+        }
+    }
+
+    pub fn random_unit() -> Vec3 {
+        return Vec3::unit_vec(Vec3::random_in_unit_sphere());
+    }
+
+    pub fn unit_vec(vec: Vec3) -> Vec3 {
+        return vec / vec.len();
+    }
+
+    pub fn dot(u: Vec3, v: Vec3) -> f64 {
+        return
+            u[0] * v[0]
+            + u[1] * v[1]
+            + u[2] * v[2]
+    }
+
     pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
         return Vec3{x:x,y:y,z:z};
     }
@@ -65,13 +75,6 @@ impl Vec3 {
             x: self[1] * v[2] - self[2] * v[1],
             y: self[2] * v[0] - self[0] * v[2],
             z: self[0] * v[1] - self[1] * v[0]}
-    }
-
-    pub fn dot(self, v: Vec3) -> f64 {
-        return
-              self[0] * v[0]
-            + self[1] * v[1]
-            + self[2] * v[2]
     }
 
 }
