@@ -10,10 +10,10 @@ mod ray;
 use ray::Ray;
 use rand::Rng;
 mod hittables;
-use hittables::{Sphere, Plane, Hittable, HittableVec, HitRecord, Diffuse, Metal};
+use hittables::{Material,Sphere, Plane, Hittable, HittableVec, HitRecord, Diffuse, Metal, TexMat};
 use indicatif::{ProgressBar, ProgressStyle};
 mod texture;
-use texture::load_texture;
+use texture::Texture;
 
 // NOTE: add concurrency
 
@@ -25,38 +25,6 @@ const RAY_RECURSION_DEPTH: u32 = 50;
 const ALMOST_ZERO: f64 = 0.001;
 type Pixel = [i32; 3];
 type PArr = [Pixel; IWIDTH*IHEIGHT];
-
-const BROWN_MATTE: Diffuse = Diffuse{
-    attenuation: Color{x: 0.51, y: 0.31, z: 0.21}
-};
-
-const CLEAR_METAL: Metal = Metal{
-    attenuation: Color{x: 1.0, y: 1.0, z: 1.0}
-};
-
-const BLUE_METAL: Metal = Metal{
-    attenuation: Color{x: 0.20, y: 0.20, z: 0.70}
-};
-
-const GREEN_METAL: Metal = Metal{
-    attenuation: Color{x: 0.0, y: 0.70, z: 0.0}
-};
-
-const RED_METAL: Metal = Metal{
-    attenuation: Color{x: 0.6, y: 0.1, z: 0.1}
-};
-
-const BLACK_METAL: Metal = Metal{
-    attenuation: Color{x: 0.1, y: 0.1, z: 0.1}
-};
-
-const BLACK_MATTE: Metal = Metal{
-    attenuation: Color{x: 0.1, y: 0.1, z: 0.1}
-};
-
-const GREEN_MATTE: Diffuse = Diffuse{
-    attenuation: Color{x: 0.21, y: 0.61, z: 0.21}
-};
 
 fn get_random(
     range: Option<Range<f64>>,
@@ -88,16 +56,27 @@ fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
 }
 
 fn main() -> () {
-    load_texture();
+    let test_tex = Texture::new("img/diff.jpg".to_string());
+
+    let brown_matte: Diffuse = Diffuse{ attenuation: Color{x: 0.51, y: 0.31, z: 0.21} };
+    let clear_metal: Metal = Metal{ attenuation: Color{x: 1.0, y: 1.0, z: 1.0} };
+    let blue_metal: Metal = Metal{ attenuation: Color{x: 0.20, y: 0.20, z: 0.70} };
+    let green_metal: Metal = Metal{ attenuation: Color{x: 0.0, y: 0.70, z: 0.0} };
+    let red_metal: Metal = Metal{ attenuation: Color{x: 0.6, y: 0.1, z: 0.1} };
+    let black_metal: Metal = Metal{ attenuation: Color{x: 0.1, y: 0.1, z: 0.1} };
+    let black_matte: Metal = Metal{ attenuation: Color{x: 0.1, y: 0.1, z: 0.1} };
+    let green_matte: Diffuse = Diffuse{ attenuation: Color{x: 0.21, y: 0.61, z: 0.21} };
+
+
     let mut objects = HittableVec::new();
-    objects.push(Box::new(Sphere{center: Vec3::new(-0.51, 0.0, -1.0), radius: 0.5, material: &BROWN_MATTE}));
-    objects.push(Box::new(Sphere{center: Vec3::new(0.51, 0.0, -1.0), radius: 0.5, material: &BLUE_METAL}));
-    objects.push(Box::new(Sphere{center: Vec3::new(-0.1, -0.35, 0.2), radius: 0.15, material: &CLEAR_METAL}));
-    objects.push(Box::new(Sphere{center: Vec3::new(-1.2, 0.0, 0.0), radius: 0.5, material: &BLUE_METAL}));
-    objects.push(Box::new(Sphere{center: Vec3::new(1.2, 0.0, 0.0), radius: 0.5, material: &RED_METAL}));
-    objects.push(Box::new(Sphere{center: Vec3::new(0.5, -0.35, -0.3), radius: 0.15, material: &GREEN_MATTE}));
-    objects.push(Box::new(Sphere{center: Vec3::new(-0.7, -0.35, -0.48), radius: 0.15, material: &GREEN_METAL}));
-    objects.push(Box::new(Plane{y:-0.5, material: &BLACK_MATTE }));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.51, 0.0, -1.0), radius: 0.5, material: Box::new(brown_matte)}));
+    objects.push(Box::new(Sphere{center: Vec3::new(0.51, 0.0, -1.0), radius: 0.5, material: Box::new(blue_metal)}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.1, -0.35, 0.2), radius: 0.15, material: Box::new(clear_metal)}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-1.2, 0.0, 0.0), radius: 0.5, material: Box::new(blue_metal)}));
+    objects.push(Box::new(Sphere{center: Vec3::new(1.2, 0.0, 0.0), radius: 0.5, material: Box::new(red_metal)}));
+    objects.push(Box::new(Sphere{center: Vec3::new(0.5, -0.35, -0.3), radius: 0.15, material: Box::new(black_matte)}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.7, -0.35, -0.48), radius: 0.15, material: Box::new(green_metal)}));
+    objects.push(Box::new(Plane{y:-0.5, material: Box::new(TexMat{ texture: test_tex}) }));
 
     let mut im: PArr = [[0,0,0]; IWIDTH*IHEIGHT];
 
