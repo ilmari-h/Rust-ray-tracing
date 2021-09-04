@@ -22,6 +22,14 @@ impl Vec3 {
         return inbound - 2.0*Vec3::dot(inbound,normal) * normal;
     }
 
+    pub fn refract(inbound: Vec3, normal: Vec3, etai_over_etat: f64) -> Vec3 {
+        let mut cos_theta = Vec3::dot(-inbound, normal);
+        cos_theta = if cos_theta > 1.0 { 1.0 } else { cos_theta };
+        let r_out_perp = etai_over_etat * ( inbound + cos_theta * normal );
+        let r_out_parallel = -((1.0 - r_out_perp.len_sq()).abs()).sqrt() * normal;
+        return r_out_perp + r_out_parallel;
+    }
+
     pub fn random_in_unit_sphere() -> Vec3 {
         loop {
             let vec = Vec3::new_random(Some(-1.0..1.0));

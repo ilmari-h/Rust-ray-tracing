@@ -10,13 +10,17 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new( aspect_r: f64 ) -> Camera {
+    pub fn new( aspect_r: f64, fov: f64, origin: Vec3 ) -> Camera {
+
+        let theta = fov.to_radians();
+        let v = (theta/2.0).tan();
+        let vp_w = 2.0 * v;
+        let vp_h = vp_w / aspect_r;
+
         let focal_l = 1.0;
-        let vp_h_f = 2.0;
-        let vp_w_f = aspect_r * vp_h_f;
-        let origin = Point3::new(0.0,0.4,1.0);
-        let horizontal_max = Vec3::new(vp_w_f, 0.0, 0.0);
-        let vertical_max = Vec3::new(0.0, vp_h_f, 0.0);
+
+        let horizontal_max = Vec3::new(vp_w, 0.0, 0.0);
+        let vertical_max = Vec3::new(0.0, vp_h, 0.0);
 
         return Camera{
             origin: origin,
@@ -35,7 +39,7 @@ impl Camera {
             self.low_left_corner
                 + h_offset * self.horizontal_max
                 + v_offset * self.vertical_max
-                - self.origin
+                - self.origin + Vec3::new(0.0,-0.2,0.0)
         );
     }
 }

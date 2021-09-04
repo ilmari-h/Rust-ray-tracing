@@ -1,42 +1,34 @@
 extern crate indicatif;
+
+use std::sync::Arc;
 use std::fs::File;
 use std::io::prelude::*;
-use std::ops::Range;
 mod camera;
 use camera::Camera;
 mod vec;
 use vec::{Vec3, Color, Point3};
 mod ray;
 use ray::Ray;
-use rand::Rng;
 mod hittables;
-use hittables::{Material,Sphere, Plane, Hittable, HittableVec, HitRecord, Diffuse, Metal, TexMat};
+use hittables::{Sphere, Plane, Hittable, HittableVec, HitRecord};
+mod materials;
+use materials::{Diffuse, Metal, Dielectric, TexMat};
 use indicatif::{ProgressBar, ProgressStyle};
 mod texture;
 use texture::Texture;
+mod util;
+use util::randomf;
 
 // NOTE: add concurrency
 
 const ASPECT_R: f64 = 16.0 / 9.0;
-const IWIDTH: usize = 720; // Making this big causes stack overflow because of array size IWIDTH*IHEIGHT.
+const IWIDTH: usize = 1280; // Making this big causes stack overflow because of array size IWIDTH*IHEIGHT.
 const IHEIGHT: usize = ( IWIDTH as f32 / ASPECT_R as f32 ) as usize ;
 const BLACK: Vec3 = Vec3{x:0.0,y:0.0,z:0.0};
 const RAY_RECURSION_DEPTH: u32 = 50;
 const ALMOST_ZERO: f64 = 0.001;
 type Pixel = [i32; 3];
-type PArr = [Pixel; IWIDTH*IHEIGHT];
-
-fn get_random(
-    range: Option<Range<f64>>,
-    ) -> f64 {
-    let mut rng = rand::thread_rng();
-    match range {
-        Some(r) => return rng.gen_range(r),
-        None => {
-            return rng.gen_range(0.0..1.0);
-        }
-    }
-}
+type PArr = Vec<Pixel>;
 
 fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
     let collision: Option<HitRecord> = objects.hit(ray,ALMOST_ZERO,f64::INFINITY);
@@ -56,29 +48,29 @@ fn ray_color(ray: &Ray, objects: &HittableVec, depth: u32) -> Color {
 }
 
 fn main() -> () {
-    let test_tex = Texture::new("img/diff.jpg".to_string());
+    let test_tex = Texture::new("img/tile2_diff.jpg".to_string(), 1.0);
 
-    let brown_matte: Diffuse = Diffuse{ attenuation: Color{x: 0.51, y: 0.31, z: 0.21} };
-    let clear_metal: Metal = Metal{ attenuation: Color{x: 1.0, y: 1.0, z: 1.0} };
-    let blue_metal: Metal = Metal{ attenuation: Color{x: 0.20, y: 0.20, z: 0.70} };
-    let green_metal: Metal = Metal{ attenuation: Color{x: 0.0, y: 0.70, z: 0.0} };
-    let red_metal: Metal = Metal{ attenuation: Color{x: 0.6, y: 0.1, z: 0.1} };
-    let black_metal: Metal = Metal{ attenuation: Color{x: 0.1, y: 0.1, z: 0.1} };
-    let black_matte: Metal = Metal{ attenuation: Color{x: 0.1, y: 0.1, z: 0.1} };
-    let green_matte: Diffuse = Diffuse{ attenuation: Color{x: 0.21, y: 0.61, z: 0.21} };
+    let brown_matte = Arc::new( Diffuse{ attenuation: Color{x: 0.51, y: 0.31, z: 0.21} });
+    let clear_metal = Arc::new(Metal{ attenuation: Color{x: 1.0, y: 1.0, z: 1.0}, fuzz: 0.0 } );
+    let blue_metal = Arc::new( Metal{ attenuation: Color{x: 0.20, y: 0.20, z: 0.70}, fuzz: 0.0 });
+    let green_metal = Arc::new (Metal{ attenuation: Color{x: 0.0, y: 0.70, z: 0.0}, fuzz: 0.1 });
+    let black_metal = Arc::new (Metal{ attenuation: Color{x: 0.1, y: 0.1, z: 0.1} , fuzz: 0.0 } );
+    let glass_m = Arc::new(  Dielectric{ index_of_refraction: 1.5 } );
+
+    let texture_m = Arc::new( TexMat{ texture: test_tex } );
 
 
     let mut objects = HittableVec::new();
-    objects.push(Box::new(Sphere{center: Vec3::new(-0.51, 0.0, -1.0), radius: 0.5, material: Box::new(brown_matte)}));
-    objects.push(Box::new(Sphere{center: Vec3::new(0.51, 0.0, -1.0), radius: 0.5, material: Box::new(blue_metal)}));
-    objects.push(Box::new(Sphere{center: Vec3::new(-0.1, -0.35, 0.2), radius: 0.15, material: Box::new(clear_metal)}));
-    objects.push(Box::new(Sphere{center: Vec3::new(-1.2, 0.0, 0.0), radius: 0.5, material: Box::new(blue_metal)}));
-    objects.push(Box::new(Sphere{center: Vec3::new(1.2, 0.0, 0.0), radius: 0.5, material: Box::new(red_metal)}));
-    objects.push(Box::new(Sphere{center: Vec3::new(0.5, -0.35, -0.3), radius: 0.15, material: Box::new(black_matte)}));
-    objects.push(Box::new(Sphere{center: Vec3::new(-0.7, -0.35, -0.48), radius: 0.15, material: Box::new(green_metal)}));
-    objects.push(Box::new(Plane{y:-0.5, material: Box::new(TexMat{ texture: test_tex}) }));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.51, 0.0, -1.0), radius: 0.5, material: brown_matte.clone()}));
+    objects.push(Box::new(Sphere{center: Vec3::new(0.51, 0.0, -1.0), radius: 0.5, material: blue_metal.clone()}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.1, -0.35, 0.2), radius: 0.15, material: clear_metal.clone()}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-1.2, 0.0, 0.0), radius: 0.5, material: green_metal.clone()}));
+    objects.push(Box::new(Sphere{center: Vec3::new(1.2, 0.0, 0.0), radius: 0.5, material: glass_m.clone()}));
+    objects.push(Box::new(Sphere{center: Vec3::new(0.5, -0.35, -0.3), radius: 0.15, material: black_metal.clone()}));
+    objects.push(Box::new(Sphere{center: Vec3::new(-0.7, -0.35, -0.48), radius: 0.15, material: green_metal.clone()}));
+    objects.push(Box::new(Plane{y:-0.5, material: texture_m.clone() } ) );
 
-    let mut im: PArr = [[0,0,0]; IWIDTH*IHEIGHT];
+    let mut im: PArr = vec![];
 
     println!("Rendering image...");
     im = render(&im, &objects); // TODO combine these two
@@ -88,7 +80,7 @@ fn main() -> () {
 fn render(img: &PArr, objects: &HittableVec) -> PArr {
 
     // Camera
-    let camera = Camera::new( ASPECT_R );
+    let camera = Camera::new( ASPECT_R, 60.0, Vec3::new(0.0, 0.75, 3.0) );
     let pixel_samples = 100;
     let bar = ProgressBar::new(IHEIGHT as u64);
     bar.set_style(ProgressStyle::default_bar()
@@ -105,11 +97,11 @@ fn render(img: &PArr, objects: &HittableVec) -> PArr {
         for _ in 0..pixel_samples {
 
             let u: f64 = ( // horizontal offset percentage
-                ( x as f32 + get_random(None) as f32 )
+                ( x as f32 + randomf(None) as f32 )
                 / ( IWIDTH as f32 - 1.0 )
             ).into();
             let v: f64 = ( // vertical offset percentage
-                ( y as f32 + get_random(None) as f32 )
+                ( y as f32 + randomf(None) as f32 )
                 / ( IHEIGHT as f32 - 1.0 )
             ).into();
 
@@ -126,7 +118,7 @@ fn render(img: &PArr, objects: &HittableVec) -> PArr {
         ) * 255.0;
 
         // Add pixel
-        n_img[i] = [color[0] as i32,color[1] as i32,color[2] as i32];
+        n_img.push( [color[0] as i32,color[1] as i32,color[2] as i32] );
 
         // screen coordinates
         x = x+1;

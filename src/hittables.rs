@@ -1,18 +1,19 @@
+use std::sync::Arc;
 use crate::vec::{Vec3, Point3, Color, NEAR_ZERO};
 use crate::ray::Ray;
-use crate::texture::Texture;
+use crate::materials::Material;
 
 pub type HittableVec = Vec<Box<dyn Hittable>>;
 
 pub struct Sphere {
     pub center: Point3,
     pub radius: f64,
-    pub material: Box< dyn Material>
+    pub material: Arc< dyn Material>
 }
 
 pub struct Plane {
     pub y: f64,
-    pub material: Box<dyn Material >
+    pub material: Arc<dyn Material >
 }
 
 #[derive(Copy, Clone)]
@@ -22,6 +23,7 @@ pub struct HitRecord<'a> {
     pub front_face: bool,
     pub hit_material: &'a dyn Material,
     pub t: f64,
+    // NOTE: add Point3 for local coordinate that was hit to map texture.
 }
 
 impl HitRecord<'_> {
@@ -30,60 +32,8 @@ impl HitRecord<'_> {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct Diffuse {
-    pub attenuation: Color
-}
-
-#[derive(Copy, Clone)]
-pub struct Metal {
-    pub attenuation: Color
-}
-
-pub struct TexMat {
-    // pub specular_map: Tex,
-    pub texture: Texture
-    // pub
-}
-
 fn is_front_facing(ray: &Ray, outward_normal: Vec3) -> bool {
     return Vec3::dot(ray.dir, outward_normal).is_sign_negative();
-}
-
-pub trait Material {
-    fn scatter(&self, record: &HitRecord, ray_in: &Ray) -> (Ray, Color);
-}
-
-impl Material for TexMat {
-    fn scatter(&self, record: &HitRecord, _: &Ray) -> (Ray, Color) {
-        //let target = record.p + record.normal + Vec3::random_unit();
-        //let x = record.p.x;
-        //let y = record.p.y;
-        let img = &self.texture.image;
-        let (x_b, y_b) = img.dimensions();
-        let target = record.p + record.normal + Vec3::random_unit();
-        let x = (record.p.x * 500.0 ) as i32 % x_b as i32;
-        let y = (record.p.z * 500.0) as i32 % y_b as i32; // Assuming world z coordinate maps to image y
-        let px = img.get_pixel(x.abs() as u32, y.abs() as u32);
-        let r = px.0[0] as f64 / 255.0;
-        let g = px.0[1] as f64 / 255.0;
-        let b = px.0[2] as f64 / 255.0;
-        return (Ray::new(record.p, target - record.p), Vec3::new(r*0.8,g*0.8,b*0.8));
-    }
-}
-
-impl Material for Diffuse {
-    fn scatter(&self, record: &HitRecord, _: &Ray) -> (Ray, Color) {
-        let target = record.p + record.normal + Vec3::random_unit();
-        return (Ray::new(record.p, target - record.p), self.attenuation);
-    }
-}
-
-impl Material for Metal {
-    fn scatter(&self, record: &HitRecord, ray_in: &Ray) -> (Ray, Color) {
-        let reflected = Vec3::reflect(ray_in.dir,record.normal);
-        return (Ray::new(record.p, reflected), self.attenuation);
-    }
 }
 
 pub trait Hittable {
@@ -100,7 +50,7 @@ impl Hittable for HittableVec {
             let new_hit_record = hittable.hit(ray,t_min,closest_so_far);
             match new_hit_record {
                 Some(hit) => {
-                    hit_rec = new_hit_record; // Only this issue left
+                    hit_rec = new_hit_record;
                     closest_so_far = hit.t;
                 },
                 None => ()
