@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::vec::{Vec3, Point3, Color, NEAR_ZERO};
+use crate::vec::*;
 use crate::ray::Ray;
 use crate::materials::Material;
 
@@ -64,14 +64,14 @@ impl Hittable for Plane {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
 
         // Plane
-        let plane_normal = Vec3::new(0.0,-1.0,0.0);
+        let plane_normal = v3!(0.0,-1.0,0.0);
         let point_on_ray = ray.orig;
         let denom = Vec3::dot(ray.dir, plane_normal);
         if denom < NEAR_ZERO {
             return None;
         }
-        let point_on_plane = Vec3::new(0.0, self.y, 0.0);
-        let t = (Vec3::dot((point_on_plane - point_on_ray),plane_normal) / denom).abs();
+        let point_on_plane = v3!(0.0, self.y, 0.0);
+        let t = (Vec3::dot(point_on_plane - point_on_ray,plane_normal) / denom).abs();
 
         if t < t_min || t > t_max {
             return None;

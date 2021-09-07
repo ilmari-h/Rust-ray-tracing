@@ -4,6 +4,12 @@ use rand::Rng;
 pub type Point3 = Vec3;
 pub type Color = Vec3;
 
+macro_rules! v3 {
+    ($x:expr, $y:expr, $z:expr) => (
+        Vec3{x:$x, y:$y, z:$z};
+    )
+} pub (crate) use v3;
+
 #[derive(Copy, Clone)]
 pub struct Vec3 {
     pub x: f64,
@@ -85,6 +91,23 @@ impl Vec3 {
             z: self[0] * v[1] - self[1] * v[0]}
     }
 
+    pub fn rotate_x(self, pitch: f64) -> Vec3 {
+        let r = pitch.to_radians();
+        return Vec3{
+            x: self.x,
+            y: self.y * r.cos() - self.z * r.sin(),
+            z: self.y * r.sin() + self.z * r.cos()
+        }
+    }
+
+    pub fn rotate_y(self, yaw: f64) -> Vec3 {
+        let r = yaw.to_radians();
+        return Vec3{
+            x: self.x * r.cos() + self.z * r.sin(),
+            y: self.y,
+            z: -self.x * r.sin() + self.z * r.cos()
+        }
+    }
 }
 
 impl ops::Neg for Vec3 {
