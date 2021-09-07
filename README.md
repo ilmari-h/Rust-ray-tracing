@@ -2,4 +2,4 @@
 Ray tracing with the CPU using Rust.
 
 
-![alt text](image.webp "Logo Title Text 1")
+![preview image](image.webp "Final ray traced image.")
